@@ -19,6 +19,7 @@ include_directories(
 add_executable(assignment_main
 	assignment/assignment_main.cpp
 	assignment/render/shader.cpp
+
 )
 target_link_libraries(assignment_main
 	${OPENGL_LIBRARY}

@@ -13,6 +13,9 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include "building.cpp"
+#include "floor.cpp"
+
 static GLFWwindow *window;
 static int windowWidth = 1024;
 static int windowHeight = 768;
@@ -21,12 +24,13 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 static void cursor_callback(GLFWwindow *window, double xpos, double ypos);
 
 // OpenGL camera view parameters
-static glm::vec3 eye_center(-278.0f, 273.0f, 800.0f);
-static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
+static glm::vec3 eye_center(0, 50, 800);
+static glm::vec3 lookat(0, 0, 100);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
+
 static float FoV = 45.0f;
-static float zNear = 600.0f;
-static float zFar = 1500.0f;
+static float zNear = 50.0f;
+static float zFar = 1500.0f; //2500f;
 
 // Lighting control
 float reflectance = 0.78;
@@ -70,224 +74,17 @@ static void saveDepthTexture(GLuint fbo, std::string filename) {
     stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
 }
 
-struct CornellBox {
+bool isBuildingInView(const glm::vec3 &position, const glm::mat4 &vp) {
+    glm::vec4 clipSpacePos = vp* glm::vec4(position, 1.0f);
 
-	// Refer to original Cornell Box data
-	// from https://www.graphics.cornell.edu/online/box/data.html
+    if (clipSpacePos.w != 0.0f) {
+        clipSpacePos /= clipSpacePos.w;
+    }
 
-	GLfloat vertex_buffer_data[60] = {
-		// Floor
-		-552.8, 0.0, 0.0,
-		0.0, 0.0,   0.0,
-		0.0, 0.0, -559.2,
-		-549.6, 0.0, -559.2,
-
-		// Ceiling
-		-556.0, 548.8, 0.0,
-		-556.0, 548.8, -559.2,
-		0.0, 548.8, -559.2,
-		0.0, 548.8,   0.0,
-
-		// Left wall
-		-552.8,   0.0,   0.0,
-		-549.6,   0.0, -559.2,
-		-556.0, 548.8, -559.2,
-		-556.0, 548.8,   0.0,
-
-		// Right wall
-		0.0,   0.0, -559.2,
-		0.0,   0.0,   0.0,
-		0.0, 548.8,   0.0,
-		0.0, 548.8, -559.2,
-
-		// Back wall
-		-549.6,   0.0, -559.2,
-		0.0,   0.0, -559.2,
-		0.0, 548.8, -559.2,
-		-556.0, 548.8, -559.2
-	};
-
-	// TODO: set vertex normals properly
-	GLfloat normal_buffer_data[60] = {
-		// Floor
-		0.0, -1.0, 0.0,
-		0.0, -1.0, 0.0,
-		0.0, -1.0, 0.0,
-		0.0, -1.0, 0.0,
-
-		// Ceiling
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-
-		// Left wall
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-
-		// Right wall
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-
-		// Back wall
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0
-	};
-
-	GLfloat color_buffer_data[60] = {
-		// Floor
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		// Ceiling
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		// Left wall
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-
-		// Right wall
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-
-		// Back wall
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f
-	};
-
-	GLuint index_buffer_data[30] = {
-		0, 1, 2,
-		0, 2, 3,
-
-		4, 5, 6,
-		4, 6, 7,
-
-		8, 9, 10,
-		8, 10, 11,
-
-		12, 13, 14,
-		12, 14, 15,
-
-		16, 17, 18,
-		16, 18, 19,
-	};
-
-	// OpenGL buffers
-	GLuint vertexArrayID;
-	GLuint vertexBufferID;
-	GLuint indexBufferID;
-	GLuint colorBufferID;
-	GLuint normalBufferID;
-
-	// Shader variable IDs
-	GLuint mvpMatrixID;
-	GLuint lightPositionID;
-	GLuint lightIntensityID;
-	GLuint programID;
-
-	void initialize() {
-		// Create a vertex array object
-		glGenVertexArrays(1, &vertexArrayID);
-		glBindVertexArray(vertexArrayID);
-
-		// Create a vertex buffer object to store the vertex data
-		glGenBuffers(1, &vertexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data), vertex_buffer_data, GL_STATIC_DRAW);
-
-		// Create a vertex buffer object to store the color data
-		glGenBuffers(1, &colorBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, colorBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(color_buffer_data), color_buffer_data, GL_STATIC_DRAW);
-
-		// Create a vertex buffer object to store the vertex normals
-		glGenBuffers(1, &normalBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
-
-		// Create an index buffer object to store the index data that defines triangle faces
-		glGenBuffers(1, &indexBufferID);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
-
-		// Create and compile our GLSL program from the shaders
-		programID = LoadShadersFromFile("../assignment/box.vert", "../assignment/box.frag");
-		if (programID == 0)
-		{
-			std::cerr << "Failed to load shaders." << std::endl;
-		}
-
-		// Get a handle for our "MVP" uniform
-		mvpMatrixID = glGetUniformLocation(programID, "MVP");
-		lightPositionID = glGetUniformLocation(programID, "lightPosition");
-		lightPositionID = glGetUniformLocation(programID, "lightPosition");
-		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
-	}
-
-	void render(glm::mat4 cameraMatrix) {
-		glUseProgram(programID);
-
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, colorBufferID);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glEnableVertexAttribArray(2);
-		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-
-		// Set model-view-projection matrix
-		glm::mat4 mvp = cameraMatrix;
-		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
-
-		// Set light data
-		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
-		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-
-		// Draw the box
-		glDrawElements(
-			GL_TRIANGLES,      // mode
-			30,    			   // number of indices
-			GL_UNSIGNED_INT,   // type
-			(void*)0           // element array buffer offset
-		);
-
-		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
-		glDisableVertexAttribArray(2);
-	}
-
-	void cleanup() {
-		glDeleteBuffers(1, &vertexBufferID);
-		glDeleteBuffers(1, &colorBufferID);
-		glDeleteBuffers(1, &indexBufferID);
-		glDeleteBuffers(1, &normalBufferID);
-		glDeleteVertexArrays(1, &vertexArrayID);
-		glDeleteProgram(programID);
-	}
-};
+    return (clipSpacePos.x >= -1.0f && clipSpacePos.x <= 1.0f &&
+            clipSpacePos.y >= -1.0f && clipSpacePos.y <= 1.0f &&
+            clipSpacePos.z >= -1.0f && clipSpacePos.z <= 1.0f);
+}
 
 int main(void)
 {
@@ -334,11 +131,23 @@ int main(void)
 	glClearColor(0.2f, 0.2f, 0.25f, 0.0f);
 
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
+	glDisable(GL_CULL_FACE);
 
-    // Create the classical Cornell Box
-	CornellBox b;
-	b.initialize();
+    // Initialize objects here
+    Floor floor;
+    floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000));
+
+    std::vector<Building> buildings;
+    int numBuildings = 8;
+    for (int i = 0; i < numBuildings; i++) {
+        Building b;
+        float gapBetweenBuildings = 200;
+
+        b.initialize(glm::vec3(-(gapBetweenBuildings * numBuildings / 2) + gapBetweenBuildings * i, 60, 150 ),
+                     glm::vec3(20, 60, 20));
+        buildings.push_back(b);
+    }
+
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix;
@@ -351,7 +160,19 @@ int main(void)
 		viewMatrix = glm::lookAt(eye_center, lookat, up);
 		glm::mat4 vp = projectionMatrix * viewMatrix;
 
-		b.render(vp);
+		// Render objects here
+        floor.render(vp);
+        floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
+
+        for (int i = 0; i < numBuildings; i++) {
+            Building b = buildings[i];
+            b.render(vp);
+            if (!isBuildingInView(b.position, vp)) {
+                std::cout << i << std::endl;
+                b.updatePosition(glm::vec3(eye_center.x + (i * 50.0f), b.position.y, eye_center.z - 300.0f));
+            }
+        }
+
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
             saveDepthTexture(0, filename);
@@ -366,8 +187,13 @@ int main(void)
 	} // Check if the ESC key was pressed or the window was closed
 	while (!glfwWindowShouldClose(window));
 
-	// Clean up
-	b.cleanup();
+	// Clean up here
+    floor.cleanup();
+
+    for (Building &b : buildings) {
+        b.cleanup();
+    }
+
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
 
@@ -376,42 +202,48 @@ int main(void)
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode)
 {
+    float movementSpeed = 20.0f;
+
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
 		eye_center = glm::vec3(-278.0f, 273.0f, 800.0f);
-		lightPosition = glm::vec3(-275.0f, 500.0f, -275.0f);
+		// lightPosition = glm::vec3(-275.0f, 500.0f, -275.0f);
 
-	}
-
-	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		eye_center.y += 20.0f;
-	}
-
-	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		eye_center.y -= 20.0f;
-	}
-
-	if (key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		eye_center.x -= 20.0f;
-	}
-
-	if (key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		eye_center.x += 20.0f;
 	}
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		lightPosition.z -= 20.0f;
+		eye_center.z -= movementSpeed;
+        lookat.z -= movementSpeed;
 	}
 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		lightPosition.z += 20.0f;
+		eye_center.z += movementSpeed;
+        lookat.z += movementSpeed;
 	}
+
+	if (key == GLFW_KEY_A && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		eye_center.x -= movementSpeed;
+        lookat.x -= movementSpeed;
+	}
+
+	if (key == GLFW_KEY_D && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		eye_center.x += movementSpeed;
+        lookat.x += movementSpeed;
+	}
+
+//	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
+//	{
+//		lightPosition.z -= 20.0f;
+//	}
+//
+//	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
+//	{
+//		lightPosition.z += 20.0f;
+//	}
 
 	if (key == GLFW_KEY_SPACE && (action == GLFW_REPEAT || action == GLFW_PRESS))
     {
