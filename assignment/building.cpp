@@ -37,6 +37,7 @@ static GLuint LoadTextureTileBox(const char *texture_file_path) {
 struct Building {
     glm::vec3 position;
     glm::vec3 scale;
+    glm::vec3 lightPosition, lightIntensity;
 
     void updatePosition(glm::vec3 newPos) {
         position = newPos;
@@ -76,16 +77,15 @@ struct Building {
     };
 
     GLuint vertexArrayID, vertexBufferID, indexBufferID, uvBufferID, normalBufferID;
-    GLuint textureID, textureSamplerID, programID, mvpMatrixID, lightPosID, lightIntensityID;
-    glm::vec3 lightPosition, lightIntensity;
+    GLuint textureID, textureSamplerID, programID, mvpMatrixID, lightPositionID, lightIntensityID;
 
-    void initialize(glm::vec3 pos, glm::vec3 scl, glm::vec3 lightPosition, glm::vec3 lightIntensity) {
+    void initialize(glm::vec3 pos, glm::vec3 scl, glm::vec3 __lightPosition, glm::vec3 __lightIntensity) {
         for (int i = 0; i < 24; ++i) uv_buffer_data[2*i+1] *= 5;
 
         position = pos;
         scale = scl;
-        lightPosition = lightPosition;
-        lightIntensity = lightIntensity;
+        lightPosition = __lightPosition;
+        lightIntensity = __lightIntensity;
 
         glGenVertexArrays(1, &vertexArrayID);
         glBindVertexArray(vertexArrayID);
@@ -98,13 +98,13 @@ struct Building {
         glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
         glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data), uv_buffer_data, GL_STATIC_DRAW);
 
-        glGenBuffers(1, &indexBufferID);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
-
         glGenBuffers(1, &normalBufferID);
         glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
         glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
+
+        glGenBuffers(1, &indexBufferID);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
         textureID = LoadTextureTileBox("../assignment/assets/building.jpg");
         programID = LoadShadersFromFile("../assignment/shaders/standardObj.vert",
@@ -116,7 +116,7 @@ struct Building {
 
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
-        lightPosID = glGetUniformLocation(programID, "lightPosition");
+        lightPositionID = glGetUniformLocation(programID, "lightPosition");
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
     }
 
@@ -128,7 +128,7 @@ struct Building {
         glm::mat4 mvp = cameraMatrix * modelMatrix;
 
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
-        glUniform3fv(lightPosID, 1, &lightPosition[0]);
+        glUniform3fv(lightPositionID, 1, &lightPosition[0]);
         glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
 
         glEnableVertexAttribArray(0);
@@ -153,8 +153,6 @@ struct Building {
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(2);
-
-        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     void cleanup() {

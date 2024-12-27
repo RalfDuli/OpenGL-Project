@@ -14,6 +14,7 @@
 struct Floor {
     glm::vec3 position;        // Position of the floor
     glm::vec2 scale;           // Size of the floor in X and Z directions
+    glm::vec3 lightIntensity, lightPosition;
 
     GLfloat vertex_buffer_data[12] = {    // Vertex definition for a flat quad
             -1.0f, 0.0f, -1.0f,   // Bottom-left
@@ -34,18 +35,27 @@ struct Floor {
             0.0f, 1.0f   // Top-left
     };
 
+    GLfloat normal_buffer_data[12] = {
+            0.0f, 1.0f, 0.0f,  // Bottom-left
+            0.0f, 1.0f, 0.0f,  // Bottom-right
+            0.0f, 1.0f, 0.0f,  // Top-right
+            0.0f, 1.0f, 0.0f   // Top-left
+    };
+
     void updatePosition(glm::vec3 newPosition) {
         position = newPosition;
     }
 
-    GLuint vertexArrayID, vertexBufferID, indexBufferID, uvBufferID, textureID;
-    GLuint mvpMatrixID, textureSamplerID, programID;
+    GLuint vertexArrayID, vertexBufferID, indexBufferID, uvBufferID, textureID, normalBufferID;
+    GLuint mvpMatrixID, textureSamplerID, lightPositionID, lightIntensityID, programID;
 
-    void initialize(glm::vec3 position, glm::vec2 scale) {
+    void initialize(glm::vec3 position, glm::vec2 scale, glm::vec3 __lightPosition, glm::vec3 __lightIntensity) {
         for (int i = 0; i < 24; ++i) uv_buffer_data[i] *= 10;
 
         this->position = position;
         this->scale = scale;
+        this->lightIntensity = __lightIntensity;
+        this->lightPosition = __lightPosition;
 
         // Generate and bind vertex array object
         glGenVertexArrays(1, &vertexArrayID);
@@ -66,6 +76,10 @@ struct Floor {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
+        glGenBuffers(1, &normalBufferID);
+        glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
+
         // Load the texture
         char *textureFilePath = "../assignment/assets/floor.jpg";
         textureID = LoadTextureTileBox(textureFilePath);
@@ -80,6 +94,8 @@ struct Floor {
         // Get uniform locations
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+        lightPositionID = glGetUniformLocation(programID, "lightPosition");
+        lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
 
         GLenum errorCode = glGetError();
         if (errorCode != 0) {
@@ -102,6 +118,10 @@ struct Floor {
         glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
+        glEnableVertexAttribArray(2);
+        glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
         // Bind texture
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureID);
@@ -115,12 +135,16 @@ struct Floor {
 
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
 
+        glUniform3fv(lightPositionID, 1, &lightPosition[0]);
+        glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
+
         // Draw elements
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
 
         GLenum errorCode = glGetError();
         if (errorCode != 0) {
@@ -132,6 +156,7 @@ struct Floor {
         glDeleteBuffers(1, &vertexBufferID);
         glDeleteBuffers(1, &uvBufferID);
         glDeleteBuffers(1, &indexBufferID);
+        glDeleteBuffers(1, &normalBufferID);
         glDeleteTextures(1, &textureID);
         glDeleteVertexArrays(1, &vertexArrayID);
         glDeleteProgram(programID);

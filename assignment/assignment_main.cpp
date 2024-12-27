@@ -37,7 +37,7 @@ static float zFar = 1500.0f; //2500f;
 float reflectance = 0.78;
 static glm::vec3 lightIntensity(18.4 * reflectance, 15.6 * reflectance, 8.0 * reflectance);
 
-static glm::vec3 lightPosition(-275.0f, 500.0f, -275.0f);
+static glm::vec3 lightPosition(lookat.x - 50, 500.0f, lookat.z);
 
 // Shadow mapping
 static glm::vec3 lightUp(0, 0, 1);
@@ -141,7 +141,7 @@ int main(void)
     };
 
     Floor floor;
-    floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000));
+    floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000), lightPosition, lightIntensity);
 
     std::vector<Building> buildings;
     int numBuildings = 8;
@@ -219,7 +219,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
 		eye_center = glm::vec3(-278.0f, 273.0f, 800.0f);
-		// lightPosition = glm::vec3(-275.0f, 500.0f, -275.0f);
+		lightPosition = glm::vec3(eye_center.x - 50, 500.0f, eye_center.z);
 
 	}
 
@@ -247,12 +247,12 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         lookat.x += movementSpeed;
 	}
 
-//	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
+//	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
 //	{
 //		lightPosition.z -= 20.0f;
 //	}
 //
-//	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
+//	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
 //	{
 //		lightPosition.z += 20.0f;
 //	}
