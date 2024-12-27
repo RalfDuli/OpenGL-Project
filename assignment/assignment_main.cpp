@@ -26,13 +26,25 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 static void cursor_callback(GLFWwindow *window, double xpos, double ypos);
 
 // OpenGL camera view parameters
-static glm::vec3 eye_center(0, 50, 800);
-static glm::vec3 lookat(0, 0, 100); // Remove 200 from lookat, eye_center
+static glm::vec3 eye_center(0, 250, 800);
+static glm::vec3 lookat(0, 200, 0); // Remove 200 from lookat, eye_center
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
+
+Skybox skybox;
+
+//static float viewAzimuth = 0.f;
+//static float viewPolar = 0.f;
+//static float viewDistance = 300.0f;
+
+//static glm::vec3 eye_center = glm::vec3(
+//        viewDistance * cos(viewAzimuth),
+//        viewDistance * cos(viewPolar),
+//        viewDistance * sin(viewAzimuth)
+//        );
 
 static float FoV = 45.0f;
 static float zNear = 50.0f;
-static float zFar = 1500.0f; //2500f;
+static float zFar = 2000.0f; //1500.0f;
 
 // Lighting control
 float reflectance = 0.78;
@@ -135,14 +147,7 @@ int main(void)
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 
-    // Initialize objects here
-    std::vector<std::string> faces = {
-            "../assignment/assets/right.png", "../assignment/assets/left.png",  "../assignment/assets/up.png",
-            "../assignment/assets/down.png", "../assignment/assets/front.png", "../assignment/assets/back.png"
-    };
-
-    Skybox skybox;
-    glm::vec3 skyboxScale(500.0f);
+    glm::vec3 skyboxScale(900.0f);
     skybox.initialize(glm::vec3(0,0,-0), skyboxScale);
 
     Floor floor;
@@ -154,8 +159,8 @@ int main(void)
         Building b;
         float gapBetweenBuildings = 200;
 
-        b.initialize(glm::vec3(-(gapBetweenBuildings * numBuildings / 2) + gapBetweenBuildings * i, 60, 150 ),
-                     glm::vec3(20, 60, 20),
+        b.initialize(glm::vec3(-(gapBetweenBuildings * numBuildings / 2) + gapBetweenBuildings * i, 0, 150 ),
+                     glm::vec3(20, 160, 20),
                      lightPosition,
                      lightIntensity);
         buildings.push_back(b);
@@ -236,24 +241,28 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	{
 		eye_center.z -= movementSpeed;
         lookat.z -= movementSpeed;
+        skybox.pos.z -= movementSpeed;
 	}
 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		eye_center.z += movementSpeed;
         lookat.z += movementSpeed;
+        skybox.pos.z += movementSpeed;
 	}
 
 	if (key == GLFW_KEY_A && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		eye_center.x -= movementSpeed;
         lookat.x -= movementSpeed;
+        skybox.pos.x -= movementSpeed;
 	}
 
 	if (key == GLFW_KEY_D && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		eye_center.x += movementSpeed;
         lookat.x += movementSpeed;
+        skybox.pos.x += movementSpeed;
 	}
 
 //	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))

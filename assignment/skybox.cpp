@@ -234,8 +234,8 @@ struct Skybox {
         // -----------------------
         glm::mat4 modelMatrix = glm::mat4(1.0f);
         // Scale the box along each axis to make it look like a building
-        modelMatrix = glm::scale(modelMatrix, scale);
         modelMatrix = glm::translate(modelMatrix, pos);
+        modelMatrix = glm::scale(modelMatrix, scale);
         // -----------------------
 
         // Set model-view-projection matrix
