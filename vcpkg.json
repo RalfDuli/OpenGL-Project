@@ -1,0 +1,48 @@
+{
+  "name" : "assignment",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "80d54ff62d528339c626a6fbc3489a7f25956ade",
+  "dependencies" : [ {
+    "name" : "assimp",
+    "version>=" : "5.4.3"
+  }, {
+    "name" : "draco",
+    "version>=" : "1.5.7"
+  }, {
+    "name" : "jhasse-poly2tri",
+    "version>=" : "2023-12-27"
+  }, {
+    "name" : "kubazip",
+    "version>=" : "0.3.3"
+  }, {
+    "name" : "minizip",
+    "version>=" : "1.3.1#1"
+  }, {
+    "name" : "polyclipping",
+    "version>=" : "6.4.2#12"
+  }, {
+    "name" : "pugixml",
+    "version>=" : "1.14"
+  }, {
+    "name" : "rapidjson",
+    "version>=" : "2023-07-17#1"
+  }, {
+    "name" : "stb",
+    "version>=" : "2024-07-29#1"
+  }, {
+    "name" : "utfcpp",
+    "version>=" : "4.0.5"
+  }, {
+    "name" : "vcpkg-cmake-config",
+    "version>=" : "2024-05-23"
+  }, {
+    "name" : "vcpkg-cmake-get-vars",
+    "version>=" : "2024-09-22"
+  }, {
+    "name" : "vcpkg-cmake",
+    "version>=" : "2024-04-23"
+  }, {
+    "name" : "zlib",
+    "version>=" : "1.3.1"
+  } ]
+}

@@ -15,6 +15,7 @@
 
 #include "building.cpp"
 #include "floor.cpp"
+#include "model.cpp"
 
 static GLFWwindow *window;
 static int windowWidth = 1024;
@@ -25,7 +26,7 @@ static void cursor_callback(GLFWwindow *window, double xpos, double ypos);
 
 // OpenGL camera view parameters
 static glm::vec3 eye_center(0, 50, 800);
-static glm::vec3 lookat(0, 0, 100);
+static glm::vec3 lookat(0, 0, 100); // Remove 200 from lookat, eye_center
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 
 static float FoV = 45.0f;
@@ -134,6 +135,11 @@ int main(void)
 	glDisable(GL_CULL_FACE);
 
     // Initialize objects here
+    std::vector<std::string> faces = {
+            "../assignment/assets/right.png", "../assignment/assets/left.png",  "../assignment/assets/up.png",
+            "../assignment/assets/down.png", "../assignment/assets/front.png", "../assignment/assets/back.png"
+    };
+
     Floor floor;
     floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000));
 
@@ -144,10 +150,16 @@ int main(void)
         float gapBetweenBuildings = 200;
 
         b.initialize(glm::vec3(-(gapBetweenBuildings * numBuildings / 2) + gapBetweenBuildings * i, 60, 150 ),
-                     glm::vec3(20, 60, 20));
+                     glm::vec3(20, 60, 20),
+                     lightPosition,
+                     lightIntensity);
         buildings.push_back(b);
     }
 
+    Model model("../assignment/assets/uploads_files_5572778_PLANE.obj");
+    glm::vec3 modelPos(0, 40, 100);
+    glm::vec3 modelScl(1);
+    model.initialize(modelPos, modelScl);
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix;
@@ -161,17 +173,16 @@ int main(void)
 		glm::mat4 vp = projectionMatrix * viewMatrix;
 
 		// Render objects here
+
         floor.render(vp);
         floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
 
         for (int i = 0; i < numBuildings; i++) {
             Building b = buildings[i];
             b.render(vp);
-            if (!isBuildingInView(b.position, vp)) {
-                std::cout << i << std::endl;
-                b.updatePosition(glm::vec3(eye_center.x + (i * 50.0f), b.position.y, eye_center.z - 300.0f));
-            }
         }
+
+        model.draw(vp);
 
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
@@ -188,6 +199,7 @@ int main(void)
 	while (!glfwWindowShouldClose(window));
 
 	// Clean up here
+
     floor.cleanup();
 
     for (Building &b : buildings) {

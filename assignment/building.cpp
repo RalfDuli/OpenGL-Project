@@ -66,14 +66,26 @@ struct Building {
             16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
     };
 
-    GLuint vertexArrayID, vertexBufferID, indexBufferID, uvBufferID;
-    GLuint textureID, textureSamplerID, programID, mvpMatrixID;
+    GLfloat normal_buffer_data[72] = {
+            0.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, -1.0f,  0.0f, 0.0f, -1.0f,  0.0f, 0.0f, -1.0f,  0.0f, 0.0f, -1.0f,
+            -1.0f, 0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 0.0f,
+            0.0f, -1.0f, 0.0f,  0.0f, -1.0f, 0.0f,  0.0f, -1.0f, 0.0f,  0.0f, -1.0f, 0.0f
+    };
 
-    void initialize(glm::vec3 pos, glm::vec3 scl) {
+    GLuint vertexArrayID, vertexBufferID, indexBufferID, uvBufferID, normalBufferID;
+    GLuint textureID, textureSamplerID, programID, mvpMatrixID, lightPosID, lightIntensityID;
+    glm::vec3 lightPosition, lightIntensity;
+
+    void initialize(glm::vec3 pos, glm::vec3 scl, glm::vec3 lightPosition, glm::vec3 lightIntensity) {
         for (int i = 0; i < 24; ++i) uv_buffer_data[2*i+1] *= 5;
 
         position = pos;
         scale = scl;
+        lightPosition = lightPosition;
+        lightIntensity = lightIntensity;
 
         glGenVertexArrays(1, &vertexArrayID);
         glBindVertexArray(vertexArrayID);
@@ -90,9 +102,13 @@ struct Building {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
+        glGenBuffers(1, &normalBufferID);
+        glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
+
         textureID = LoadTextureTileBox("../assignment/assets/building.jpg");
-        programID = LoadShadersFromFile("../assignment/shaders/building.vert",
-                                        "../assignment/shaders/building.frag");
+        programID = LoadShadersFromFile("../assignment/shaders/standardObj.vert",
+                                        "../assignment/shaders/standardObj.frag");
 
         if (programID == 0) {
             std::cerr << "Failed to load shaders." << std::endl;
@@ -100,6 +116,8 @@ struct Building {
 
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+        lightPosID = glGetUniformLocation(programID, "lightPosition");
+        lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
     }
 
     void render(glm::mat4 cameraMatrix) {
@@ -110,6 +128,8 @@ struct Building {
         glm::mat4 mvp = cameraMatrix * modelMatrix;
 
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
+        glUniform3fv(lightPosID, 1, &lightPosition[0]);
+        glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
 
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
@@ -118,6 +138,10 @@ struct Building {
         glEnableVertexAttribArray(1);
         glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+        glEnableVertexAttribArray(2);
+        glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureID);
@@ -128,12 +152,16 @@ struct Building {
 
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     void cleanup() {
         glDeleteBuffers(1, &vertexBufferID);
         glDeleteBuffers(1, &uvBufferID);
         glDeleteBuffers(1, &indexBufferID);
+        glDeleteBuffers(1, &normalBufferID);
         glDeleteVertexArrays(1, &vertexArrayID);
         glDeleteProgram(programID);
     }

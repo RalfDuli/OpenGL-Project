@@ -71,8 +71,8 @@ struct Floor {
         textureID = LoadTextureTileBox(textureFilePath);
 
         // Load shaders
-        programID = LoadShadersFromFile("../assignment/shaders/floor.vert",
-                                        "../assignment/shaders/floor.frag");
+        programID = LoadShadersFromFile("../assignment/shaders/standardObj.vert",
+                                        "../assignment/shaders/standardObj.frag");
         if (programID == 0) {
             std::cerr << "Failed to load shaders." << std::endl;
         }
@@ -112,6 +112,7 @@ struct Floor {
         modelMatrix = glm::scale(modelMatrix, glm::vec3(scale.x, 1, scale.y));
 
         glm::mat4 mvp = cameraMatrix * modelMatrix;
+
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
 
         // Draw elements
