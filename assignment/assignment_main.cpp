@@ -16,6 +16,7 @@
 #include "building.cpp"
 #include "floor.cpp"
 #include "model.cpp"
+#include "skybox.cpp"
 
 static GLFWwindow *window;
 static int windowWidth = 1024;
@@ -140,6 +141,10 @@ int main(void)
             "../assignment/assets/down.png", "../assignment/assets/front.png", "../assignment/assets/back.png"
     };
 
+    Skybox skybox;
+    glm::vec3 skyboxScale(500.0f);
+    skybox.initialize(glm::vec3(0,0,-0), skyboxScale);
+
     Floor floor;
     floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000), lightPosition, lightIntensity);
 
@@ -174,6 +179,8 @@ int main(void)
 
 		// Render objects here
 
+        skybox.render(vp);
+
         floor.render(vp);
         floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
 
@@ -182,7 +189,7 @@ int main(void)
             b.render(vp);
         }
 
-        model.draw(vp);
+        //model.draw(vp);
 
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
@@ -199,6 +206,8 @@ int main(void)
 	while (!glfwWindowShouldClose(window));
 
 	// Clean up here
+
+    skybox.cleanup();
 
     floor.cleanup();
 
