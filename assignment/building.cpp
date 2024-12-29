@@ -11,6 +11,7 @@
 
 #include <render/shader.h>
 
+
 static GLuint LoadTextureTileBox(const char *texture_file_path) {
     int w, h, channels;
     uint8_t* img = stbi_load(texture_file_path, &w, &h, &channels, 3);
@@ -105,15 +106,6 @@ struct Building {
         glGenBuffers(1, &indexBufferID);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
-
-        const char *textureFilePaths[4] = {
-                "../assignment/assets/building.jpg",
-                "../assignment/assets/building0.png",
-                "../assignment/assets/building1.png",
-                "../assignment/assets/building2.png"
-        };
-
-        const char *textureFilePath = textureFilePaths[std::rand() % 4];
 
         textureID = LoadTextureTileBox("../assignment/assets/building.jpg");
         programID = LoadShadersFromFile("../assignment/shaders/standardObj.vert",

@@ -13,6 +13,7 @@
 #include <unordered_map>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <iomanip>
 
 #include "building.cpp"
 #include "floor.cpp"
@@ -33,19 +34,9 @@ static glm::vec3 up(0.0f, 1.0f, 0.0f);
 
 Skybox skybox;
 
-//static float viewAzimuth = 0.f;
-//static float viewPolar = 0.f;
-//static float viewDistance = 300.0f;
-
-//static glm::vec3 eye_center = glm::vec3(
-//        viewDistance * cos(viewAzimuth),
-//        viewDistance * cos(viewPolar),
-//        viewDistance * sin(viewAzimuth)
-//        );
-
 static float FoV = 45.0f;
 static float zNear = 50.0f;
-static float zFar = 3000.0f; //1500.0f;
+static float zFar = 3000.0f;
 
 // Lighting control
 float reflectance = 0.78;
@@ -58,7 +49,6 @@ static glm::vec3 lightUp(0, 0, 1);
 static int shadowMapWidth = 0;
 static int shadowMapHeight = 0;
 
-// TODO: set these parameters
 static float depthFoV = 0.f;
 static float depthNear = 0.f;
 static float depthFar = 0.f;
@@ -80,7 +70,6 @@ struct Chunk {
 
     void initialize(const glm::vec2& pos, const glm::vec3& lightPos, const glm::vec3& lightIntensity) {
         position = pos;
-        float chunkWidth = BUILDINGS_PER_SIDE * GAP;
 
         // Create buildings only if they don't exist yet
         if (buildings.empty()) {
@@ -390,34 +379,79 @@ int main(void)
     glm::mat4 viewMatrix, projectionMatrix;
 	projectionMatrix = glm::perspective(glm::radians(FoV), (float)windowWidth / windowHeight, zNear, zFar);
 
-	do
-	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Time and frame rate tracking
+    static double lastTime = glfwGetTime();
+    float time = 0.0f;			// Animation time
+    float fTime = 0.0f;			// Time for measuring fps
+    unsigned long frames = 0;
 
-		viewMatrix = glm::lookAt(eye_center, lookat, up);
-		glm::mat4 vp = projectionMatrix * viewMatrix;
+    glBindVertexArray(0);
+    for(int i = 0; i < 8; i++) {
+        glDisableVertexAttribArray(i);
+    }
+    glUseProgram(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		// Render objects here
+	do {
+        double currentTime = glfwGetTime();
+        float deltaTime = float(currentTime - lastTime);
+        lastTime = currentTime;
+
+        time += deltaTime;
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        viewMatrix = glm::lookAt(eye_center, lookat, up);
+        glm::mat4 vp = projectionMatrix * viewMatrix;
+
+        // Render objects here
+
+        checkOpenGLState("Before skybox");
+        //glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_FALSE);
+        skybox.render(vp);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+        //glDisable(GL_DEPTH_TEST);
+        checkOpenGLState("After skybox");
 
         //checkOpenGLState("Before skybox");
-        glDisable(GL_DEPTH_TEST);
-        skybox.render(vp);
-        glEnable(GL_DEPTH_TEST);
+//        glDisable(GL_DEPTH_TEST);
+//        glDepthFunc(GL_LEQUAL);
+//        skybox.render(vp);
+//        glDepthFunc(GL_LESS);
+//        glEnable(GL_DEPTH_TEST);
         //checkOpenGLState("After skybox");
 
-        //checkOpenGLState("Before floor");
+        checkOpenGLState("Before floor");
         floor.render(vp);
         floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
-        //checkOpenGLState("After floor");
+        checkOpenGLState("After floor");
 
-        //checkOpenGLState("Before buildings");
+        checkOpenGLState("Before buildings");
         chunkManager->update(eye_center);
         chunkManager->render(vp);
-        //checkOpenGLState("After buildings");
+        checkOpenGLState("After buildings");
 
-//        checkOpenGLState("Before model");
-//        model.Draw(vp);
-//        checkOpenGLState("After model");
+        checkOpenGLState("Before model");
+        model.Draw(vp);
+        checkOpenGLState("After model");
+
+        // FPS tracking
+        // Count number of frames over a few seconds and take average
+        frames++;
+        fTime += deltaTime;
+        if (fTime > 2.0f) {
+            float fps = frames / fTime;
+            frames = 0;
+            fTime = 0;
+
+            std::stringstream stream;
+            stream << std::fixed << std::setprecision(2) << "Frames per second (FPS): " << fps;
+            glfwSetWindowTitle(window, stream.str().c_str());
+        }
 
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
@@ -429,6 +463,7 @@ int main(void)
 		// Swap buffers
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+
 
 	} // Check if the ESC key was pressed or the window was closed
 	while (!glfwWindowShouldClose(window));

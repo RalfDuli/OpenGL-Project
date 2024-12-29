@@ -1,7 +1,6 @@
 #version 330 core
 out vec4 FragColor;
 
-in vec2 UV;
 in vec3 worldPosition;
 in vec3 worldNormal;
 
