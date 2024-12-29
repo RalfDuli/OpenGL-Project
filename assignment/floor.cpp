@@ -122,15 +122,6 @@ struct Floor {
         glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-//        - Set the camera view to be inside the cube.
-//        - Modify the cube buffers so that the inner surfaces of the cube becomes front facing in
-//        counter-clockwise order.
-//        - Set the UV coordinates properly for each face to map to the +X, -X, +Z, -Z, +Y, -Y region in
-//        the texture. Make use of the debug textures.
-//        - Set the texture parameters properly to remove any seams appeared in the rendering.
-//        Consider setting GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T,
-//        GL_TEXTURE_MIN_FILTER, and GL_TEXTURE_M
-
         // Bind texture
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureID);

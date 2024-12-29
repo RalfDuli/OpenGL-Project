@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <iostream>
+#include <unordered_map>
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -44,7 +45,7 @@ Skybox skybox;
 
 static float FoV = 45.0f;
 static float zNear = 50.0f;
-static float zFar = 2000.0f; //1500.0f;
+static float zFar = 3000.0f; //1500.0f;
 
 // Lighting control
 float reflectance = 0.78;
@@ -64,6 +65,231 @@ static float depthFar = 0.f;
 
 // Helper flag and function to save depth maps for debugging
 static bool saveDepth = false;
+
+struct Vec2Hash {
+    std::size_t operator()(const glm::vec2& v) const {
+        return std::hash<float>()(v.x) ^ (std::hash<float>()(v.y) << 1);
+    }
+};
+
+struct Chunk {
+    glm::vec2 position;
+    std::vector<Building> buildings;
+    static const int BUILDINGS_PER_SIDE = 8;
+    static const constexpr float GAP = 200.0f;
+
+    void initialize(const glm::vec2& pos, const glm::vec3& lightPos, const glm::vec3& lightIntensity) {
+        position = pos;
+        float chunkWidth = BUILDINGS_PER_SIDE * GAP;
+
+        // Create buildings only if they don't exist yet
+        if (buildings.empty()) {
+            for (int i = 0; i < BUILDINGS_PER_SIDE; i++) {
+                for (int j = 0; j < BUILDINGS_PER_SIDE; j++) {
+                    Building b;
+                    float x = (i - BUILDINGS_PER_SIDE/2) * GAP;
+                    float z = (j - BUILDINGS_PER_SIDE/2) * GAP;
+
+                    float height = 100.0f + ((i * BUILDINGS_PER_SIDE + j) % 3) * 100.0f;
+
+                    glm::vec3 buildingPos(x, 0, z);
+                    b.initialize(buildingPos,
+                                 glm::vec3(20, height, 20),
+                                 lightPos,
+                                 lightIntensity);
+                    buildings.push_back(b);
+                }
+            }
+        }
+
+        // Update positions based on chunk position
+        updatePosition(pos);
+    }
+
+    void updatePosition(const glm::vec2& newPos) {
+        position = newPos;
+        float chunkWidth = BUILDINGS_PER_SIDE * GAP;
+        float baseX = position.x * chunkWidth;
+        float baseZ = position.y * chunkWidth;
+
+        // Update each building's position
+        for (int i = 0; i < BUILDINGS_PER_SIDE; i++) {
+            for (int j = 0; j < BUILDINGS_PER_SIDE; j++) {
+                int index = i * BUILDINGS_PER_SIDE + j;
+                float x = baseX + (i - BUILDINGS_PER_SIDE/2) * GAP;
+                float z = baseZ + (j - BUILDINGS_PER_SIDE/2) * GAP;
+
+                buildings[index].updatePosition(glm::vec3(x, 0, z));
+            }
+        }
+    }
+
+    void cleanup() {
+        for (Building& b : buildings) {
+            b.cleanup();
+        }
+        buildings.clear();
+    }
+};
+
+class ChunkManager {
+private:
+    std::unordered_map<glm::vec2, Chunk, Vec2Hash> activeChunks;
+    std::vector<Chunk> recycledChunks;  // Pool of chunks to reuse
+    int renderDistance;
+    glm::vec3 lightPosition;
+    glm::vec3 lightIntensity;
+    glm::vec2 lastUpdatePos;
+    float chunkWidth;
+
+public:
+    ChunkManager(int distance, const glm::vec3& lightPos, const glm::vec3& lightInt)
+            : renderDistance(distance),
+              lightPosition(lightPos),
+              lightIntensity(lightInt),
+              lastUpdatePos(glm::vec2(FLT_MAX))
+    {
+        chunkWidth = Chunk::BUILDINGS_PER_SIDE * Chunk::GAP;
+    }
+
+    glm::vec2 worldToChunkCoords(const glm::vec3& worldPos) {
+        return glm::vec2(
+                floor(worldPos.x / chunkWidth),
+                floor(worldPos.z / chunkWidth)
+        );
+    }
+
+    void update(const glm::vec3& cameraPos) {
+        glm::vec2 currentChunk = worldToChunkCoords(cameraPos);
+        if (currentChunk == lastUpdatePos) return;
+
+        glm::vec2 chunkDiff = currentChunk - lastUpdatePos;
+
+        // If first update or large movement, do full reset
+        if (lastUpdatePos.x > 1000000.0f || abs(chunkDiff.x) > renderDistance || abs(chunkDiff.y) > renderDistance) {
+            // Move all chunks to recycled pool
+            for (auto& chunk : activeChunks) {
+                recycledChunks.push_back(std::move(chunk.second));
+            }
+            activeChunks.clear();
+
+            // Create initial chunks, reusing from pool when possible
+            for (int x = -renderDistance; x <= renderDistance; x++) {
+                for (int z = -renderDistance; z <= renderDistance; z++) {
+                    glm::vec2 pos = currentChunk + glm::vec2(x, z);
+
+                    Chunk* chunk;
+                    if (!recycledChunks.empty()) {
+                        activeChunks[pos] = std::move(recycledChunks.back());
+                        recycledChunks.pop_back();
+                        chunk = &activeChunks[pos];
+                    } else {
+                        chunk = &activeChunks[pos];
+                    }
+                    chunk->initialize(pos, lightPosition, lightIntensity);
+                }
+            }
+        } else {
+            // Incremental update - only handle the new edge chunks
+            int dx = static_cast<int>(chunkDiff.x);
+            int dz = static_cast<int>(chunkDiff.y);
+
+            // Move chunks that are now out of range to recycled pool
+            if (dx != 0) {
+                int removeX = dx > 0 ? currentChunk.x - renderDistance - 1 : currentChunk.x + renderDistance + 1;
+                for (int z = currentChunk.y - renderDistance; z <= currentChunk.y + renderDistance; z++) {
+                    auto it = activeChunks.find(glm::vec2(removeX, z));
+                    if (it != activeChunks.end()) {
+                        recycledChunks.push_back(std::move(it->second));
+                        activeChunks.erase(it);
+                    }
+                }
+            }
+            if (dz != 0) {
+                int removeZ = dz > 0 ? currentChunk.y - renderDistance - 1 : currentChunk.y + renderDistance + 1;
+                for (int x = currentChunk.x - renderDistance; x <= currentChunk.x + renderDistance; x++) {
+                    auto it = activeChunks.find(glm::vec2(x, removeZ));
+                    if (it != activeChunks.end()) {
+                        recycledChunks.push_back(std::move(it->second));
+                        activeChunks.erase(it);
+                    }
+                }
+            }
+
+            // Add new chunks that are now in range, reusing from pool
+            if (dx != 0) {
+                int newX = dx > 0 ? currentChunk.x + renderDistance : currentChunk.x - renderDistance;
+                for (int z = currentChunk.y - renderDistance; z <= currentChunk.y + renderDistance; z++) {
+                    glm::vec2 pos(newX, z);
+                    if (activeChunks.find(pos) == activeChunks.end()) {
+                        if (!recycledChunks.empty()) {
+                            activeChunks[pos] = std::move(recycledChunks.back());
+                            recycledChunks.pop_back();
+                        }
+                        activeChunks[pos].initialize(pos, lightPosition, lightIntensity);
+                    }
+                }
+            }
+            if (dz != 0) {
+                int newZ = dz > 0 ? currentChunk.y + renderDistance : currentChunk.y - renderDistance;
+                for (int x = currentChunk.x - renderDistance; x <= currentChunk.x + renderDistance; x++) {
+                    glm::vec2 pos(x, newZ);
+                    if (activeChunks.find(pos) == activeChunks.end()) {
+                        if (!recycledChunks.empty()) {
+                            activeChunks[pos] = std::move(recycledChunks.back());
+                            recycledChunks.pop_back();
+                        }
+                        activeChunks[pos].initialize(pos, lightPosition, lightIntensity);
+                    }
+                }
+            }
+        }
+
+        lastUpdatePos = currentChunk;
+    }
+
+    void render(const glm::mat4& vp) {
+        for (auto& pair : activeChunks) {
+            for (Building& building : pair.second.buildings) {
+                building.render(vp);
+            }
+        }
+    }
+
+    void cleanup() {
+        for (auto& pair : activeChunks) {
+            pair.second.cleanup();
+        }
+        for (auto& chunk : recycledChunks) {
+            chunk.cleanup();
+        }
+        activeChunks.clear();
+        recycledChunks.clear();
+    }
+};
+
+void checkOpenGLState(const char* label) {
+    GLint program, vao, array_buffer, element_buffer;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &array_buffer);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &element_buffer);
+
+    std::cout << "=== OpenGL State at " << label << " ===" << std::endl;
+    std::cout << "Current Program: " << program << std::endl;
+    std::cout << "VAO Binding: " << vao << std::endl;
+    std::cout << "Array Buffer Binding: " << array_buffer << std::endl;
+    std::cout << "Element Buffer Binding: " << element_buffer << std::endl;
+
+    // Check vertex attribute arrays
+    for(int i = 0; i < 8; i++) {
+        GLint enabled;
+        glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+        if(enabled)
+            std::cout << "Attribute " << i << " is enabled" << std::endl;
+    }
+    std::cout << "===========================" << std::endl;
+}
 
 // This function retrieves and stores the depth map of the default frame buffer
 // or a particular frame buffer (indicated by FBO ID) to a PNG image.
@@ -147,29 +373,18 @@ int main(void)
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 
-    glm::vec3 skyboxScale(900.0f);
-    skybox.initialize(glm::vec3(0,0,-0), skyboxScale);
+    glm::vec3 skyboxScale(1300.0f);
+    skybox.initialize(glm::vec3(0,0,0), skyboxScale);
 
     Floor floor;
     floor.initialize(glm::vec3(0, 0, 100), glm::vec2(5000,5000), lightPosition, lightIntensity);
 
-    std::vector<Building> buildings;
-    int numBuildings = 8;
-    for (int i = 0; i < numBuildings; i++) {
-        Building b;
-        float gapBetweenBuildings = 200;
+    static ChunkManager *chunkManager;
+    chunkManager = new ChunkManager(1, lightPosition, lightIntensity);
 
-        b.initialize(glm::vec3(-(gapBetweenBuildings * numBuildings / 2) + gapBetweenBuildings * i, 0, 150 ),
-                     glm::vec3(20, 160, 20),
-                     lightPosition,
-                     lightIntensity);
-        buildings.push_back(b);
-    }
-
-    Model model("../assignment/assets/uploads_files_5572778_PLANE.obj");
-    glm::vec3 modelPos(0, 40, 100);
-    glm::vec3 modelScl(1);
-    model.initialize(modelPos, modelScl);
+    Model model("../assignment/assets/uploads_files_5572778_PLANE (1).obj",
+                glm::vec3(0,400,0),
+                glm::vec3(5));
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix;
@@ -184,17 +399,25 @@ int main(void)
 
 		// Render objects here
 
+        //checkOpenGLState("Before skybox");
+        glDisable(GL_DEPTH_TEST);
         skybox.render(vp);
+        glEnable(GL_DEPTH_TEST);
+        //checkOpenGLState("After skybox");
 
+        //checkOpenGLState("Before floor");
         floor.render(vp);
         floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
+        //checkOpenGLState("After floor");
 
-        for (int i = 0; i < numBuildings; i++) {
-            Building b = buildings[i];
-            b.render(vp);
-        }
+        //checkOpenGLState("Before buildings");
+        chunkManager->update(eye_center);
+        chunkManager->render(vp);
+        //checkOpenGLState("After buildings");
 
-        //model.draw(vp);
+//        checkOpenGLState("Before model");
+//        model.Draw(vp);
+//        checkOpenGLState("After model");
 
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
@@ -216,9 +439,7 @@ int main(void)
 
     floor.cleanup();
 
-    for (Building &b : buildings) {
-        b.cleanup();
-    }
+    chunkManager->cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();

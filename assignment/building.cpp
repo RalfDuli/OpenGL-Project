@@ -106,6 +106,15 @@ struct Building {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
+        const char *textureFilePaths[4] = {
+                "../assignment/assets/building.jpg",
+                "../assignment/assets/building0.png",
+                "../assignment/assets/building1.png",
+                "../assignment/assets/building2.png"
+        };
+
+        const char *textureFilePath = textureFilePaths[std::rand() % 4];
+
         textureID = LoadTextureTileBox("../assignment/assets/building.jpg");
         programID = LoadShadersFromFile("../assignment/shaders/standardObj.vert",
                                         "../assignment/shaders/standardObj.frag");
@@ -118,6 +127,11 @@ struct Building {
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
         lightPositionID = glGetUniformLocation(programID, "lightPosition");
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
+
+        GLenum errorCode = glGetError();
+        if (errorCode != 0) {
+            std::cout << "Building object error initializing: " << errorCode << std::endl;
+        }
     }
 
     void render(glm::mat4 cameraMatrix) {
