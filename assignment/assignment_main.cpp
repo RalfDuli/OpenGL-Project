@@ -315,6 +315,19 @@ bool isBuildingInView(const glm::vec3 &position, const glm::mat4 &vp) {
             clipSpacePos.z >= -1.0f && clipSpacePos.z <= 1.0f);
 }
 
+struct AnimatedModel {
+    Model* model;
+    float offset;  // Offset for animation timing
+    glm::vec3 basePosition; // Store original position for animation
+
+    AnimatedModel(Model* m, const glm::vec3& pos, float timeOffset)
+            : model(m), basePosition(pos), offset(timeOffset) {}
+};
+
+static std::vector<AnimatedModel> animatedModels;
+static const int NUM_MODELS = 5;
+static const float MODEL_SPACING = 200.0f;
+
 int main(void)
 {
 	// Initialise GLFW
@@ -371,9 +384,21 @@ int main(void)
     static ChunkManager *chunkManager;
     chunkManager = new ChunkManager(1, lightPosition, lightIntensity);
 
-    Model model("../assignment/assets/uploads_files_5572778_PLANE (1).obj",
-                glm::vec3(0,400,0),
-                glm::vec3(5));
+    std::vector<Model*> modelInstances;
+    for (int i = 0; i < NUM_MODELS; i++) {
+        float xPos = (i - NUM_MODELS/2) * MODEL_SPACING;  // Spread models along x-axis
+        glm::vec3 position(xPos, 400, 0);
+
+        Model* newModel = new Model(
+                "../assignment/assets/uploads_files_5572778_PLANE (1).obj",
+                position,
+                glm::vec3(5)
+        );
+        modelInstances.push_back(newModel);
+
+        float timeOffset = i * 0.5f;  // Offset animation timing for each model
+        animatedModels.emplace_back(newModel, position, timeOffset);
+    }
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix;
@@ -417,14 +442,6 @@ int main(void)
         //glDisable(GL_DEPTH_TEST);
         checkOpenGLState("After skybox");
 
-        //checkOpenGLState("Before skybox");
-//        glDisable(GL_DEPTH_TEST);
-//        glDepthFunc(GL_LEQUAL);
-//        skybox.render(vp);
-//        glDepthFunc(GL_LESS);
-//        glEnable(GL_DEPTH_TEST);
-        //checkOpenGLState("After skybox");
-
         checkOpenGLState("Before floor");
         floor.render(vp);
         floor.updatePosition(glm::vec3(eye_center.x, 0, eye_center.z));
@@ -436,7 +453,16 @@ int main(void)
         checkOpenGLState("After buildings");
 
         checkOpenGLState("Before model");
-        model.Draw(vp);
+        for (auto& anim : animatedModels) {
+            // Calculate new position with z-axis animation
+            glm::vec3 newPos = anim.basePosition;
+            newPos.z += sin(time * 2.0f + anim.offset) * 100.0f + lookat.z;
+            newPos.x += lookat.x;
+
+            // Update model's modelMatrix for the new position
+            anim.model->pos = newPos;
+            anim.model->Draw(vp);
+        }
         checkOpenGLState("After model");
 
         // FPS tracking
